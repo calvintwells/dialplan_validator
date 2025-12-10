@@ -291,9 +291,6 @@ extensions.conf:3 E_DP_GOTO_NOCONTEXT: context 'somewhere' not found
 ```bash
 # Validate a single file
 dialplan_validator /etc/asterisk/extensions.conf
-
-# Validate multiple files
-dialplan_validator /etc/asterisk/extensions-*.conf
 ```
 
 ### Exit Codes
