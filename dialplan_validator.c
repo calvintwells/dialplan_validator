@@ -16,7 +16,7 @@
 
 #define MAX_LINE 4096
 #define MAX_VAR_NAME 80
-#define VERSION "1.0"
+#define VERSION "1.1"
 
 typedef struct {
     int errors;
@@ -164,7 +164,7 @@ static int parse_context(char *line, validator_state *state) {
     return 1;
 }
 
-/* Parse extension line: exten => pattern,priority,app(args) */
+/* Parse extension line: exten => pattern,priority,app(args) OR same => priority,app(args) */
 static int parse_extension(char *line, validator_state *state) {
     char *arrow = strstr(line, "=>");
     if (!arrow) {
@@ -179,7 +179,7 @@ static int parse_extension(char *line, validator_state *state) {
     
     int is_same = 0;
     if (strncasecmp(keyword, "exten", 5) == 0) {
-        // Good
+        is_same = 0;
     } else if (strncasecmp(keyword, "same", 4) == 0) {
         is_same = 1;
     } else {
@@ -189,12 +189,11 @@ static int parse_extension(char *line, validator_state *state) {
         return 0;
     }
     
-    // Parse pattern, priority, app
+    // Parse data after =>
     char *data = arrow + 2;
     data = trim(data);
     
     // Split by commas (but respect balanced delimiters)
-    char *pattern = data;
     char *comma1 = NULL, *comma2 = NULL;
     int parens = 0, brackets = 0;
     
@@ -213,25 +212,68 @@ static int parse_extension(char *line, validator_state *state) {
         }
     }
     
-    if (!comma1 || !comma2) {
-        fprintf(stderr, "Line %d: Extension must have format: exten => pattern,priority,app(args)\n",
-                state->line_num);
-        state->errors++;
-        return 0;
-    }
-    
-    *comma1 = '\0';
-    *comma2 = '\0';
-    
-    char *priority_str = trim(comma1 + 1);
-    char *app = trim(comma2 + 1);
-    
-    pattern = trim(pattern);
-    
-    // Validate priority
-    if (!is_same) {
+    // Validation based on type
+    if (is_same) {
+        // same => priority,app(args)  (only 1 comma required)
+        if (!comma1) {
+            fprintf(stderr, "Line %d: 'same' must have format: same => priority,app(args)\n",
+                    state->line_num);
+            state->errors++;
+            return 0;
+        }
+        
+        *comma1 = '\0';
+        char *priority_str = trim(data);
+        char *app = trim(comma1 + 1);
+        
+        // Validate priority
+        if (strcmp(priority_str, "hint") != 0 && strcmp(priority_str, "n") != 0) {
+            char *endptr;
+            long pri = strtol(priority_str, &endptr, 10);
+            if (*endptr != '\0' && *endptr != '(') {
+                fprintf(stderr, "Line %d: Invalid priority '%s' (must be number, 'n', or 'hint')\n",
+                        state->line_num, priority_str);
+                state->errors++;
+                return 0;
+            }
+            if (pri < 1) {
+                fprintf(stderr, "Line %d: Priority must be >= 1\n", state->line_num);
+                state->errors++;
+                return 0;
+            }
+        }
+        
+        // Check if app has parentheses for arguments
+        if (strlen(app) > 0) {
+            char *paren = strchr(app, '(');
+            if (paren) {
+                if (!check_balanced(app, state)) {
+                    return 0;
+                }
+            }
+        }
+        
+        // Check variable syntax
+        check_variable_syntax(data, state);
+        
+    } else {
+        // exten => pattern,priority,app(args)  (2 commas required)
+        if (!comma1 || !comma2) {
+            fprintf(stderr, "Line %d: 'exten' must have format: exten => pattern,priority,app(args)\n",
+                    state->line_num);
+            state->errors++;
+            return 0;
+        }
+        
+        *comma1 = '\0';
+        *comma2 = '\0';
+        
+        char *pattern = trim(data);
+        char *priority_str = trim(comma1 + 1);
+        char *app = trim(comma2 + 1);
+        
+        // Validate priority
         if (strcmp(priority_str, "hint") != 0) {
-            // Check if priority is a number or 'n'
             if (strcmp(priority_str, "n") != 0) {
                 char *endptr;
                 long pri = strtol(priority_str, &endptr, 10);
@@ -248,21 +290,20 @@ static int parse_extension(char *line, validator_state *state) {
                 }
             }
         }
-    }
-    
-    // Check if app has parentheses for arguments
-    if (strlen(app) > 0) {
-        char *paren = strchr(app, '(');
-        if (paren) {
-            // Has arguments, check balanced
-            if (!check_balanced(app, state)) {
-                return 0;
+        
+        // Check if app has parentheses for arguments
+        if (strlen(app) > 0) {
+            char *paren = strchr(app, '(');
+            if (paren) {
+                if (!check_balanced(app, state)) {
+                    return 0;
+                }
             }
         }
+        
+        // Check variable syntax
+        check_variable_syntax(data, state);
     }
-    
-    // Check variable syntax in the entire line
-    check_variable_syntax(data, state);
     
     return 1;
 }
@@ -402,6 +443,7 @@ int main(int argc, char *argv[]) {
         printf("What it validates:\n");
         printf("  ✓ Context definitions [context-name]\n");
         printf("  ✓ Extension syntax: exten => pattern,priority,app(args)\n");
+        printf("  ✓ Continuation syntax: same => priority,app(args)\n");
         printf("  ✓ Balanced parentheses, brackets, braces\n");
         printf("  ✓ Quote matching\n");
         printf("  ✓ Variable syntax ${VAR} and $[EXPR]\n");
