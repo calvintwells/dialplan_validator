@@ -13,6 +13,38 @@ A lightweight, standalone syntax validator for Asterisk dialplan files. Zero dep
 
 ---
 
+## Installation
+
+### Clone the Repository
+```bash
+git clone https://github.com/calvintwells/dialplan_validator.git
+cd dialplan_validator
+```
+
+### Compile
+```bash
+gcc -o dialplan_validator dialplan_validator.c -Wall
+```
+
+### Install to System (Optional)
+```bash
+sudo cp dialplan_validator /usr/local/bin/
+sudo chmod +x /usr/local/bin/dialplan_validator
+```
+
+### Verify Installation
+```bash
+dialplan_validator --help
+```
+
+### Requirements
+
+- **Compilation:** GCC or Clang
+- **Runtime:** Nothing (zero dependencies)
+- **OS:** Linux, macOS, BSD, or any POSIX system
+
+---
+
 ## Why This Tool Exists
 
 When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error in your dialplan can break production. Traditional options have tradeoffs:
@@ -27,12 +59,13 @@ When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error 
 
 ## Table of Contents
 
+- [Installation](#installation)
+- [Why This Tool Exists](#why-this-tool-exists)
 - [Where This Tool Fits](#where-this-tool-fits)
 - [Pros and Cons](#pros-and-cons)
 - [Quick Start](#quick-start)
 - [What It Validates](#what-it-validates)
 - [What It Does NOT Validate](#what-it-does-not-validate)
-- [Installation](#installation)
 - [Usage Examples](#usage-examples)
 - [CI/CD Integration](#cicd-integration)
 - [Comparison with Other Tools](#comparison-with-other-tools)
@@ -241,37 +274,6 @@ extensions.conf:3 E_DP_GOTO_NOCONTEXT: context 'somewhere' not found
 - ✅ Catches ALL errors
 - ✅ Provides best practice hints
 - ✅ Validates semantic correctness
-
----
-
-## Installation
-
-### Method 1: Compile from Source
-```bash
-# Clone or download dialplan_validator.c
-gcc -o dialplan_validator dialplan_validator.c -Wall
-
-# Install to system (optional)
-sudo cp dialplan_validator /usr/local/bin/
-sudo chmod +x /usr/local/bin/dialplan_validator
-
-# Verify
-dialplan_validator --help
-```
-
-### Method 2: Download Binary (Future)
-```bash
-# Coming soon: Pre-compiled binaries for Linux x86_64
-wget https://github.com/calvintwells/dialplan_validator/releases/latest/download/dialplan_validator
-chmod +x dialplan_validator
-sudo mv dialplan_validator /usr/local/bin/
-```
-
-### Requirements
-
-- **Compilation:** GCC or Clang
-- **Runtime:** Nothing (zero dependencies)
-- **OS:** Linux, macOS, BSD, or any POSIX system
 
 ---
 
