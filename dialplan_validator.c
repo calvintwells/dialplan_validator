@@ -1,13 +1,13 @@
 /* dialplan_validator.c
  * Lightweight standalone Asterisk dialplan syntax validator
- * Extracts core parsing logic from pbx_config.c without Asterisk dependencies
+ * Based on actual parsing logic from asterisk/pbx/pbx_config.c
  * 
  * Compile: gcc -o dialplan_validator dialplan_validator.c -Wall
  * Usage: ./dialplan_validator /etc/asterisk/extensions-test.conf
  * 
  * GitHub: https://github.com/calvintwells/dialplan_validator
  * License: MIT
- * Version: 1.1
+ * Version: 1.2
  */
 
 #include <stdio.h>
@@ -17,7 +17,7 @@
 
 #define MAX_LINE 4096
 #define MAX_VAR_NAME 80
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 typedef struct {
     int errors;
@@ -165,6 +165,83 @@ static int parse_context(char *line, validator_state *state) {
     return 1;
 }
 
+/* 
+ * Extract label from priority string and validate priority
+ * This mimics Asterisk's logic in pbx_config.c
+ * 
+ * Asterisk logic:
+ *   if (strchr(pri, '(')) {
+ *       char *lparen = strchr(pri, '(');
+ *       char *rparen = strchr(lparen, ')');
+ *       if (rparen) {
+ *           *lparen = '\0';
+ *           lparen++;
+ *           *rparen = '\0';
+ *           label = lparen;
+ *       }
+ *   }
+ */
+static int validate_priority_with_label(char *priority_str, validator_state *state) {
+    char *label = NULL;
+    char *pri_part = priority_str;
+    
+    // Check if priority contains a label: n(label) or 1(label)
+    char *lparen = strchr(priority_str, '(');
+    if (lparen) {
+        char *rparen = strchr(lparen, ')');
+        if (!rparen) {
+            fprintf(stderr, "Line %d: Unclosed '(' in priority label\n", state->line_num);
+            state->errors++;
+            return 0;
+        }
+        
+        // Extract label (between parentheses)
+        *lparen = '\0';
+        label = lparen + 1;
+        *rparen = '\0';
+        
+        // Now pri_part is just the priority without label
+        pri_part = trim(priority_str);
+        
+        // Validate label is not empty
+        if (strlen(label) == 0) {
+            fprintf(stderr, "Line %d: Empty label in priority\n", state->line_num);
+            state->errors++;
+            return 0;
+        }
+    }
+    
+    // Validate the priority part (without label)
+    // Valid formats: 'hint', 'n', or a positive integer
+    
+    if (strcmp(pri_part, "hint") == 0) {
+        return 1;  // 'hint' is valid
+    }
+    
+    if (strcmp(pri_part, "n") == 0) {
+        return 1;  // 'n' (next) is valid
+    }
+    
+    // Must be a positive integer
+    char *endptr;
+    long pri = strtol(pri_part, &endptr, 10);
+    
+    if (*endptr != '\0') {
+        fprintf(stderr, "Line %d: Invalid priority '%s' (must be number, 'n', or 'hint')\n",
+                state->line_num, priority_str);
+        state->errors++;
+        return 0;
+    }
+    
+    if (pri < 1) {
+        fprintf(stderr, "Line %d: Priority must be >= 1\n", state->line_num);
+        state->errors++;
+        return 0;
+    }
+    
+    return 1;
+}
+
 /* Parse extension line: exten => pattern,priority,app(args) OR same => priority,app(args) */
 static int parse_extension(char *line, validator_state *state) {
     char *arrow = strstr(line, "=>");
@@ -227,21 +304,9 @@ static int parse_extension(char *line, validator_state *state) {
         char *priority_str = trim(data);
         char *app = trim(comma1 + 1);
         
-        // Validate priority
-        if (strcmp(priority_str, "hint") != 0 && strcmp(priority_str, "n") != 0) {
-            char *endptr;
-            long pri = strtol(priority_str, &endptr, 10);
-            if (*endptr != '\0' && *endptr != '(') {
-                fprintf(stderr, "Line %d: Invalid priority '%s' (must be number, 'n', or 'hint')\n",
-                        state->line_num, priority_str);
-                state->errors++;
-                return 0;
-            }
-            if (pri < 1) {
-                fprintf(stderr, "Line %d: Priority must be >= 1\n", state->line_num);
-                state->errors++;
-                return 0;
-            }
+        // Validate priority (may contain label)
+        if (!validate_priority_with_label(priority_str, state)) {
+            return 0;
         }
         
         // Check if app has parentheses for arguments
@@ -255,7 +320,7 @@ static int parse_extension(char *line, validator_state *state) {
         }
         
         // Check variable syntax
-        check_variable_syntax(data, state);
+        check_variable_syntax(app, state);
         
     } else {
         // exten => pattern,priority,app(args)  (2 commas required)
@@ -269,28 +334,14 @@ static int parse_extension(char *line, validator_state *state) {
         *comma1 = '\0';
         *comma2 = '\0';
         
-        // Pattern is in 'data', just trim it for validation
-        trim(data);  // This is the pattern (we don't need to store it)
+        // Pattern is in 'data'
+        trim(data);
         char *priority_str = trim(comma1 + 1);
         char *app = trim(comma2 + 1);
         
-        // Validate priority
-        if (strcmp(priority_str, "hint") != 0) {
-            if (strcmp(priority_str, "n") != 0) {
-                char *endptr;
-                long pri = strtol(priority_str, &endptr, 10);
-                if (*endptr != '\0' && *endptr != '(') {
-                    fprintf(stderr, "Line %d: Invalid priority '%s' (must be number, 'n', or 'hint')\n",
-                            state->line_num, priority_str);
-                    state->errors++;
-                    return 0;
-                }
-                if (pri < 1) {
-                    fprintf(stderr, "Line %d: Priority must be >= 1\n", state->line_num);
-                    state->errors++;
-                    return 0;
-                }
-            }
+        // Validate priority (may contain label)
+        if (!validate_priority_with_label(priority_str, state)) {
+            return 0;
         }
         
         // Check if app has parentheses for arguments
@@ -304,7 +355,7 @@ static int parse_extension(char *line, validator_state *state) {
         }
         
         // Check variable syntax
-        check_variable_syntax(data, state);
+        check_variable_syntax(app, state);
     }
     
     return 1;
@@ -438,7 +489,7 @@ int main(int argc, char *argv[]) {
         strcmp(argv[1], "--help") == 0 || 
         strcmp(argv[1], "help") == 0) {
         printf("Asterisk Dialplan Validator v%s\n", VERSION);
-        printf("Validates Asterisk extensions.conf syntax without requiring Asterisk\n");
+        printf("Based on actual Asterisk pbx_config.c parsing logic\n");
         printf("\n");
         printf("Usage: %s <extensions.conf>\n", argv[0]);
         printf("\n");
@@ -446,6 +497,7 @@ int main(int argc, char *argv[]) {
         printf("  ✓ Context definitions [context-name]\n");
         printf("  ✓ Extension syntax: exten => pattern,priority,app(args)\n");
         printf("  ✓ Continuation syntax: same => priority,app(args)\n");
+        printf("  ✓ Priority labels: n(label), 1(start), etc.\n");
         printf("  ✓ Balanced parentheses, brackets, braces\n");
         printf("  ✓ Quote matching\n");
         printf("  ✓ Variable syntax ${VAR} and $[EXPR]\n");
@@ -455,6 +507,13 @@ int main(int argc, char *argv[]) {
         printf("Examples:\n");
         printf("  %s /etc/asterisk/extensions.conf\n", argv[0]);
         printf("  %s /etc/asterisk/extensions-test.conf\n", argv[0]);
+        printf("\n");
+        printf("Supported priority formats:\n");
+        printf("  n              - Next priority\n");
+        printf("  n(label)       - Next priority with label\n");
+        printf("  1              - Explicit priority\n");
+        printf("  1(start)       - Explicit priority with label\n");
+        printf("  hint           - Hint priority\n");
         printf("\n");
         printf("Exit codes:\n");
         printf("  0 = Syntax valid\n");
