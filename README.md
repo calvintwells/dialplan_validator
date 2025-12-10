@@ -47,13 +47,15 @@ dialplan_validator --help
 
 ## Why This Tool Exists
 
-When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error in your dialplan can break production. Traditional options have tradeoffs:
+**If you already have asterisklint, you probably don't need this for comprehensive validation.** 
 
-- **`asterisk -rx "dialplan reload"`** - Requires full Asterisk installation, affects production
-- **asterisklint** - Comprehensive but requires Python 3 + dependencies (~50MB)
-- **Manual review** - Error-prone and slow
+This tool exists for two specific scenarios:
 
-**dialplan_validator fills the gap:** Fast syntax validation with zero dependencies, perfect for production servers and CI/CD pipelines.
+1. **Quick syntax-only checks** - When you've made small changes and only want to verify syntax without running full semantic analysis
+
+2. **Environments where Python isn't available** - Production servers, minimal containers, embedded systems, or CI/CD environments where installing Python 3 + dependencies isn't practical
+
+**In short:** This is a lightweight precursory check for quick edits, not a replacement for proper validation tools.
 
 ---
 
@@ -83,31 +85,31 @@ When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error 
 ### The Validation Hierarchy
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Level 1: SYNTAX VALIDATION (This Tool)                       │
-│ ✓ Fast (<1ms for typical configs)                            │
-│ ✓ Zero dependencies (50KB binary)                            │
-│ ✓ Catches: brackets, quotes, missing commas, invalid syntax  │
-│ ✗ Does NOT validate: app names, context references, logic    │
+│ Level 1: SYNTAX VALIDATION (This Tool)                      │
+│ ✓ Fast (<1ms for typical configs)                           │
+│ ✓ Zero dependencies (50KB binary)                           │
+│ ✓ Catches: brackets, quotes, missing commas, invalid syntax │
+│ ✗ Does NOT validate: app names, context references, logic   │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Level 2: SEMANTIC VALIDATION (asterisklint)                  │
-│ ✓ Validates application names (Dial, Hangup, etc.)           │
-│ ✓ Validates function names (CALLERID, IF, etc.)              │
-│ ✓ Checks Goto/Gosub destinations exist                       │
-│ ✓ Validates application arguments                            │
-│ ✓ Pattern canonicalization suggestions                       │
-│ ✗ Requires: Python 3 + dependencies (~50MB)                  │
-│ ✗ Slower: ~100x slower than syntax-only                      │
+│ Level 2: SEMANTIC VALIDATION (asterisklint)                 │
+│ ✓ Validates application names (Dial, Hangup, etc.)          │
+│ ✓ Validates function names (CALLERID, IF, etc.)             │
+│ ✓ Checks Goto/Gosub destinations exist                      │
+│ ✓ Validates application arguments                           │
+│ ✓ Pattern canonicalization suggestions                      │
+│ ✗ Requires: Python 3 + dependencies (~50MB)                 │
+│ ✗ Slower: ~100x slower than syntax-only                     │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ Level 3: RUNTIME VALIDATION (Asterisk)                       │
-│ ✓ Full dialplan loading and compilation                      │
-│ ✓ Module availability checking                               │
-│ ✓ Complete semantic analysis                                 │
-│ ✗ Requires: Full Asterisk installation                       │
-│ ✗ Risk: Affects production if used on live system            │
+│ Level 3: RUNTIME VALIDATION (Asterisk)                      │
+│ ✓ Full dialplan loading and compilation                     │
+│ ✓ Module availability checking                              │
+│ ✓ Complete semantic analysis                                │
+│ ✗ Requires: Full Asterisk installation                      │
+│ ✗ Risk: Affects production if used on live system           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -124,7 +126,7 @@ When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error 
 | **Zero Dependencies** | Single 50KB binary, runs anywhere |
 | **Blazing Fast** | <1ms for 100 lines, ~50ms for 10,000 lines |
 | **Production Ready** | Safe for deployment on live servers |
-| **CI/CD Friendly** | Perfect for pre-commit hooks (instant feedback) |
+| **CI/CD Friendly** | Perfect for pre-commit hooks and fast-fail pipelines |
 | **Easy Deployment** | Just copy the binary, no installation needed |
 | **No Python Required** | Works on minimal/embedded systems |
 | **Syntax Focus** | Catches the most common deployment-breaking errors |
@@ -144,18 +146,24 @@ When managing high-volume Asterisk systems (40-100+ CPS), a single syntax error 
 
 ### 🎯 Sweet Spot
 
-Perfect for:
-- ✅ Pre-commit hooks (instant syntax feedback)
-- ✅ Production server validation (no Python dependency)
-- ✅ Quick syntax checks during editing
+**Use dialplan_validator when:**
+- ✅ Making small changes and only need syntax validation
+- ✅ Production servers where Python isn't installed
 - ✅ Minimal environments (containers, embedded systems)
-- ✅ First-pass validation before comprehensive checks
+- ✅ Quick syntax-only checks during iterative editing
+- ✅ Fast-fail in CI/CD pipelines (syntax before semantics)
 
-Not sufficient for:
-- ❌ Sole validation tool (use with asterisklint)
-- ❌ Logic error detection
-- ❌ Best practices enforcement
-- ❌ Application-specific validation
+**Use asterisklint instead when:**
+- ✅ Making significant dialplan changes
+- ✅ You need semantic validation (app names, goto targets, etc.)
+- ✅ You have Python 3 available
+- ✅ Pre-deployment comprehensive validation
+- ✅ Learning Asterisk (asterisklint teaches best practices)
+
+**Don't use dialplan_validator when:**
+- ❌ You have asterisklint and need comprehensive validation
+- ❌ You need to validate application names or logic
+- ❌ You're doing a full dialplan review
 
 ---
 
@@ -432,10 +440,10 @@ pipeline {
 
 | Scenario | Use This | Not That | Why |
 |----------|----------|----------|-----|
-| **Pre-commit hook** | dialplan_validator | asterisk reload | Instant feedback, no Asterisk required |
-| **CI/CD pipeline** | Both tools | Asterisk only | Comprehensive validation without production risk |
+| **Pre-commit hook** | dialplan_validator | asterisk reload | No Asterisk installation required |
+| **CI/CD pipeline** | Both tools | Asterisk only | Layered validation without production risk |
 | **Production deployment** | dialplan_validator first | Direct reload | Syntax check before affecting live system |
-| **Development** | asterisklint | Manual review | Catches logic errors during development |
+| **Development** | asterisklint | dialplan_validator | Catches logic errors during development |
 | **Minimal systems** | dialplan_validator | asterisklint | No Python dependency |
 | **Learning Asterisk** | asterisklint | dialplan_validator | Educational feedback on best practices |
 
@@ -514,107 +522,91 @@ Tested on: Intel Xeon E5-2680 v4 @ 2.40GHz
 
 ## Recommended Workflow
 
-### Layered Validation Strategy
+### If You Have asterisklint
+```bash
+# Small edit workflow (syntax-only check)
+vi extensions.conf
+dialplan_validator extensions.conf  # Quick syntax check
+
+# Comprehensive validation before commit
+asterisklint dialplan-check extensions.conf  # Full validation
+```
+
+### If You DON'T Have asterisklint
+```bash
+# Production server workflow (no Python available)
+vi /etc/asterisk/extensions.conf
+dialplan_validator /etc/asterisk/extensions.conf
+asterisk -rx "dialplan reload"
+```
+
+### CI/CD Workflow (Layered Validation)
 ```bash
 #!/bin/bash
-# comprehensive-validation.sh
+# Fast syntax check first (fails fast on obvious errors)
+dialplan_validator extensions.conf || exit 1
 
-echo "Layer 1: Fast syntax check..."
-dialplan_validator /etc/asterisk/extensions.conf
-if [ $? -ne 0 ]; then
-    echo "❌ Syntax errors detected!"
-    exit 1
-fi
-echo "✅ Syntax valid"
-
-echo ""
-echo "Layer 2: Semantic validation..."
-if command -v asterisklint &> /dev/null; then
-    export ALINT_IGNORE=H_DP_,H_PAT_NON_CANONICAL
-    asterisklint dialplan-check /etc/asterisk/extensions.conf
-    if [ $? -ne 0 ]; then
-        echo "❌ Logic errors detected!"
-        exit 1
-    fi
-    echo "✅ Semantic validation passed"
-else
-    echo "⚠️  asterisklint not installed (pip3 install asterisklint)"
-fi
-
-echo ""
-echo "✅ All validation passed - safe to deploy"
+# Only run comprehensive check if syntax is valid
+asterisklint dialplan-check extensions.conf
 ```
 
-### Development Workflow
-```
-┌──────────────────────────────────────────────────────────┐
-│ 1. Edit Dialplan                                         │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│ 2. Syntax Check (dialplan_validator) - INSTANT          │
-│    - Catches typos, missing brackets, etc.              │
-│    - Runs in <1ms                                        │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│ 3. Git Commit (pre-commit hook)                          │
-│    - Automatic syntax validation                         │
-│    - Blocks commit if errors found                       │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│ 4. CI/CD Pipeline (Both Tools)                           │
-│    - dialplan_validator: Fast first pass                 │
-│    - asterisklint: Comprehensive check                   │
-│    - Blocks deployment if errors found                   │
-└──────────────────────────────────────────────────────────┘
-                         ↓
-┌──────────────────────────────────────────────────────────┐
-│ 5. Production Deployment                                 │
-│    - Final syntax check on target server                 │
-│    - Safe to reload dialplan                             │
-└──────────────────────────────────────────────────────────┘
-```
+**This saves CI/CD resources:** If there's a syntax error, you fail immediately instead of running full semantic analysis.
 
 ---
 
 ## Real-World Example
 
-### Before: Manual Deployment (Risky)
+### Scenario 1: Quick Edit on Production Server (No Python)
 ```bash
-# Edit file on production server
-vi /etc/asterisk/extensions.conf
+# Production server - Python not installed
+ssh server01
+vi /etc/asterisk/extensions.conf  # Change one line
 
-# Hope for the best
+# Quick syntax check
+dialplan_validator /etc/asterisk/extensions.conf
+# ✅ Syntax valid
+
+# Safe to reload
 asterisk -rx "dialplan reload"
-
-# Oops, typo broke production at 50+ CPS
-# Calls failing, customers angry
-# Takes 30 minutes to troubleshoot and fix
 ```
 
-### After: Validated Deployment (Safe)
+**Why not asterisklint?** Production servers often don't have Python/pip for security reasons.
+
+---
+
+### Scenario 2: Development with asterisklint Available
 ```bash
-# Edit file locally
+# Making 2-line change
 vi extensions.conf
 
-# Instant syntax check (<1ms)
+# Quick syntax check during editing
 dialplan_validator extensions.conf
 # ✅ Syntax valid
 
-# Commit triggers comprehensive check
+# Continue editing...
+vi extensions.conf
+
+# Before commit: comprehensive check
+asterisklint dialplan-check extensions.conf
+# ✅ All checks passed
+
 git commit -m "Updated routing logic"
-# Pre-commit hook: ✅ Syntax valid
-# CI/CD pipeline: ✅ asterisklint passed
-
-# Deploy to production
-rsync extensions.conf server01:/etc/asterisk/
-
-# Final safety check on production
-ssh server01 "dialplan_validator /etc/asterisk/extensions.conf && asterisk -rx 'dialplan reload'"
-# ✅ Deployed safely, zero downtime
 ```
+
+**Why use dialplan_validator here?** Quick syntax-only validation during iterative editing, then full validation (asterisklint) before commit.
+
+---
+
+### Scenario 3: Large Refactor
+```bash
+# Refactoring entire context (100+ lines changed)
+vi extensions.conf
+
+# Skip dialplan_validator, go straight to comprehensive check
+asterisklint dialplan-check extensions.conf
+```
+
+**Why skip dialplan_validator?** For large changes, you need full semantic validation anyway, so the extra syntax-only step doesn't add value.
 
 ---
 
@@ -700,9 +692,30 @@ Contributions welcome! This tool is intentionally simple (syntax-only validation
 
 ### Q: Should I use this instead of asterisklint?
 
-**A:** No, use **both**. They serve different purposes:
-- dialplan_validator: Fast syntax validation (Level 1)
-- asterisklint: Comprehensive semantic validation (Level 2)
+**A:** No. If you have asterisklint, use that for comprehensive validation.
+
+Use dialplan_validator only when:
+- You need quick syntax-only validation for small edits
+- You're on a system without Python (production servers, embedded systems)
+- You're doing rapid iterative editing and don't need semantic checks yet
+
+**Rule of thumb:**
+- Small edit, syntax-only check? → dialplan_validator
+- Significant changes or pre-deployment? → asterisklint
+- No Python available? → dialplan_validator only
+
+### Q: When would I use both tools?
+
+**A:** Only in specific CI/CD scenarios where you want layered validation:
+```bash
+# Layer 1: Fast syntax check (fails fast on obvious errors)
+dialplan_validator extensions.conf || exit 1
+
+# Layer 2: Only run comprehensive check if syntax is valid
+asterisklint dialplan-check extensions.conf
+```
+
+This prevents wasting CI/CD resources on semantic checks when there are obvious syntax errors.
 
 ### Q: Why doesn't this validate application names?
 
@@ -776,10 +789,15 @@ SOFTWARE.
 
 ---
 
-**Remember:** This tool is your **first line of defense**, not your **only defense**. Use it with asterisklint for comprehensive validation.
+**Remember:** This tool is for **quick syntax checks** when you don't have or don't need asterisklint's comprehensive validation.
 ```bash
-# The winning combination:
+# Quick edit? Syntax-only check:
+dialplan_validator extensions.conf
+
+# Significant changes? Comprehensive validation:
+asterisklint dialplan-check extensions.conf
+
+# CI/CD? Layered approach (fail fast):
 dialplan_validator extensions.conf && \
-asterisklint dialplan-check extensions.conf && \
-echo "Safe to deploy!"
+asterisklint dialplan-check extensions.conf
 ```
