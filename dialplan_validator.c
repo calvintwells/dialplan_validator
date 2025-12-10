@@ -7,7 +7,7 @@
  * 
  * GitHub: https://github.com/calvintwells/dialplan_validator
  * License: MIT
- * Version: 1.2
+ * Version: 1.3
  */
 
 #include <stdio.h>
@@ -17,7 +17,7 @@
 
 #define MAX_LINE 4096
 #define MAX_VAR_NAME 80
-#define VERSION "1.2"
+#define VERSION "1.3"
 
 typedef struct {
     int errors;
@@ -43,26 +43,12 @@ static int is_comment_or_blank(const char *line) {
     return (*line == ';' || *line == '\0' || *line == '#');
 }
 
-/* Check balanced delimiters */
+/* Check balanced delimiters - EXCLUDES quotes (too context-sensitive in Asterisk) */
 static int check_balanced(const char *str, validator_state *state) {
     int parens = 0, brackets = 0, braces = 0;
-    int in_quote = 0;
-    char quote_char = 0;
     
     for (const char *p = str; *p; p++) {
-        if (in_quote) {
-            if (*p == quote_char && *(p-1) != '\\') {
-                in_quote = 0;
-            }
-            continue;
-        }
-        
         switch (*p) {
-            case '"':
-            case '\'':
-                quote_char = *p;
-                in_quote = 1;
-                break;
             case '(': parens++; break;
             case ')': parens--; break;
             case '[': brackets++; break;
@@ -71,6 +57,7 @@ static int check_balanced(const char *str, validator_state *state) {
             case '}': braces--; break;
         }
         
+        // Check for negative counts (too many closing delimiters)
         if (parens < 0 || brackets < 0 || braces < 0) {
             fprintf(stderr, "Line %d: Unbalanced delimiters (too many closing)\n", 
                     state->line_num);
@@ -79,12 +66,7 @@ static int check_balanced(const char *str, validator_state *state) {
         }
     }
     
-    if (in_quote) {
-        fprintf(stderr, "Line %d: Unclosed quote\n", state->line_num);
-        state->errors++;
-        return 0;
-    }
-    
+    // Check final balance
     if (parens != 0 || brackets != 0 || braces != 0) {
         fprintf(stderr, "Line %d: Unbalanced delimiters (parens=%d, brackets=%d, braces=%d)\n",
                 state->line_num, parens, brackets, braces);
@@ -499,7 +481,6 @@ int main(int argc, char *argv[]) {
         printf("  ✓ Continuation syntax: same => priority,app(args)\n");
         printf("  ✓ Priority labels: n(label), 1(start), etc.\n");
         printf("  ✓ Balanced parentheses, brackets, braces\n");
-        printf("  ✓ Quote matching\n");
         printf("  ✓ Variable syntax ${VAR} and $[EXPR]\n");
         printf("  ✓ Priority values (must be >=1, 'n', or 'hint')\n");
         printf("  ✓ Include and switch statements\n");
@@ -518,6 +499,10 @@ int main(int argc, char *argv[]) {
         printf("Exit codes:\n");
         printf("  0 = Syntax valid\n");
         printf("  1 = Syntax errors found or file not found\n");
+        printf("\n");
+        printf("Note: Quote checking is intentionally disabled as Asterisk handles\n");
+        printf("      quotes in a context-dependent way that varies by application.\n");
+        printf("      Apostrophes in text (e.g., \"It's working\") are valid.\n");
         printf("\n");
         printf("GitHub: https://github.com/calvintwells/dialplan_validator\n");
         printf("License: MIT\n");
