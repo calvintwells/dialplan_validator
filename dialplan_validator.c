@@ -4,6 +4,9 @@
  * 
  * Compile: gcc -o dialplan_validator dialplan_validator.c -Wall
  * Usage: ./dialplan_validator /etc/asterisk/extensions-test.conf
+ * 
+ * GitHub: https://github.com/calvintwells/dialplan_validator
+ * License: MIT
  */
 
 #include <stdio.h>
@@ -13,6 +16,7 @@
 
 #define MAX_LINE 4096
 #define MAX_VAR_NAME 80
+#define VERSION "1.0"
 
 typedef struct {
     int errors;
@@ -371,9 +375,50 @@ static int validate_dialplan(const char *filename) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
+        fprintf(stderr, "Asterisk Dialplan Validator v%s\n", VERSION);
         fprintf(stderr, "Usage: %s <extensions.conf>\n", argv[0]);
-        fprintf(stderr, "Example: %s /etc/asterisk/extensions-test.conf\n", argv[0]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Examples:\n");
+        fprintf(stderr, "  %s /etc/asterisk/extensions.conf\n", argv[0]);
+        fprintf(stderr, "  %s /etc/asterisk/extensions-test.conf\n", argv[0]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Exit codes:\n");
+        fprintf(stderr, "  0 = Syntax valid\n");
+        fprintf(stderr, "  1 = Syntax errors found or file not found\n");
+        fprintf(stderr, "\n");
+        fprintf(stderr, "For help: %s --help\n", argv[0]);
         return 1;
+    }
+    
+    // Check for help flags
+    if (strcmp(argv[1], "-h") == 0 || 
+        strcmp(argv[1], "--help") == 0 || 
+        strcmp(argv[1], "help") == 0) {
+        printf("Asterisk Dialplan Validator v%s\n", VERSION);
+        printf("Validates Asterisk extensions.conf syntax without requiring Asterisk\n");
+        printf("\n");
+        printf("Usage: %s <extensions.conf>\n", argv[0]);
+        printf("\n");
+        printf("What it validates:\n");
+        printf("  ✓ Context definitions [context-name]\n");
+        printf("  ✓ Extension syntax: exten => pattern,priority,app(args)\n");
+        printf("  ✓ Balanced parentheses, brackets, braces\n");
+        printf("  ✓ Quote matching\n");
+        printf("  ✓ Variable syntax ${VAR} and $[EXPR]\n");
+        printf("  ✓ Priority values (must be >=1, 'n', or 'hint')\n");
+        printf("  ✓ Include and switch statements\n");
+        printf("\n");
+        printf("Examples:\n");
+        printf("  %s /etc/asterisk/extensions.conf\n", argv[0]);
+        printf("  %s /etc/asterisk/extensions-test.conf\n", argv[0]);
+        printf("\n");
+        printf("Exit codes:\n");
+        printf("  0 = Syntax valid\n");
+        printf("  1 = Syntax errors found or file not found\n");
+        printf("\n");
+        printf("GitHub: https://github.com/calvintwells/dialplan_validator\n");
+        printf("License: MIT\n");
+        return 0;
     }
     
     return validate_dialplan(argv[1]);
