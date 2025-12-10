@@ -2,8 +2,8 @@
  * Lightweight standalone Asterisk dialplan syntax validator
  * Extracts core parsing logic from pbx_config.c without Asterisk dependencies
  * 
- * Compile: gcc -o dialplan_validator dialplan_validator.c
- * Usage: ./dialplan_validator /etc/asterisk/extensions.conf
+ * Compile: gcc -o dialplan_validator dialplan_validator.c -Wall
+ * Usage: ./dialplan_validator /etc/asterisk/extensions-test.conf
  */
 
 #include <stdio.h>
@@ -98,7 +98,6 @@ static int check_variable_syntax(const char *str, validator_state *state) {
     while ((p = strchr(p, '$')) != NULL) {
         if (*(p+1) == '{') {
             // Found ${, look for closing }
-            const char *start = p + 2;
             int brace_count = 1;
             p += 2;
             
@@ -116,7 +115,6 @@ static int check_variable_syntax(const char *str, validator_state *state) {
             }
         } else if (*(p+1) == '[') {
             // Found $[, look for closing ]
-            const char *start = p + 2;
             int bracket_count = 1;
             p += 2;
             
