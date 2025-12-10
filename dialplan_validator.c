@@ -7,6 +7,7 @@
  * 
  * GitHub: https://github.com/calvintwells/dialplan_validator
  * License: MIT
+ * Version: 1.1
  */
 
 #include <stdio.h>
@@ -268,7 +269,8 @@ static int parse_extension(char *line, validator_state *state) {
         *comma1 = '\0';
         *comma2 = '\0';
         
-        char *pattern = trim(data);
+        // Pattern is in 'data', just trim it for validation
+        trim(data);  // This is the pattern (we don't need to store it)
         char *priority_str = trim(comma1 + 1);
         char *app = trim(comma2 + 1);
         
